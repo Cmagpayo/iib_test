@@ -1,0 +1,46 @@
+BROKER SCHEMA meralco.esb.madp.notifications.esql
+PATH meralco.esb.madp.esql;
+
+CREATE COMPUTE MODULE ProcessResponse_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		DECLARE inputRootRef REFERENCE TO InputRoot;
+		DECLARE outputRootRef REFERENCE TO OutputRoot;
+
+		CALL parseBLOB(inputRootRef);
+		CALL logJSON(inputRootRef, 'Response' || ' ' || UDP_LOG_PREFIX);
+		
+		DECLARE jsonResponse REFERENCE TO inputRootRef.JSON.Data.notificationResponse;	
+		DECLARE isSuccessful CHARACTER COALESCE(jsonResponse.isSuccessful,'');
+		DECLARE result CHARACTER COALESCE(jsonResponse.result,'');
+	
+		CREATE LASTCHILD OF outputRootRef DOMAIN 'XMLNSC' NAME 'XMLNSC';
+		DECLARE xmlRef REFERENCE TO outputRootRef.XMLNSC;
+		CREATE LASTCHILD OF xmlRef NAME 'notificationResponse';
+		DECLARE responseRef REFERENCE TO xmlRef.notificationResponse;
+		
+		CREATE LASTCHILD OF responseRef NAME 'isSuccessful' VALUE isSuccessful;
+		CREATE LASTCHILD OF responseRef NAME 'result' VALUE result;
+		
+		CALL logXML(outputRootRef);
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE parseBLOB(INOUT inputRootRef REFERENCE)
+	BEGIN
+		DECLARE messageBlob BLOB ASBITSTREAM(inputRootRef.BLOB.*);
+		DECLARE text CHARACTER CAST(messageBlob AS CHAR CCSID 437);
+		DECLARE jsonText CHARACTER '';
+		
+		DECLARE textSize INTEGER LENGTH(text);
+		DECLARE jsonStartIndex INTEGER POSITION('{' IN text);
+		DECLARE jsonEndIndex INTEGER POSITION('}' IN text REPEAT -1);
+		
+		SET jsonText = SUBSTRING(text FROM jsonStartIndex FOR jsonEndIndex - jsonStartIndex + 1);
+		
+		SET inputRootRef.BLOB = NULL;
+		CREATE LASTCHILD OF inputRootRef DOMAIN('JSON') PARSE(jsonText,InputProperties.Encoding,InputProperties.CodedCharSetId);
+	END;
+END MODULE;

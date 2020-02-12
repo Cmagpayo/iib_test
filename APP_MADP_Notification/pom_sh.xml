@@ -1,0 +1,71 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.indra.meralco.customer</groupId>
+	<artifactId>APP_MADP_Notifications</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>MADP_Notifications</name>
+	<description>Add MADP_Notifications</description>
+
+	<properties>
+		<bar_name>BAR_${project.name}-${target_env}.${BUILD_NUMBER}.bar</bar_name>
+		<bar_file>${BASE_BAR_LOCATION}/${target_env}/${bar_name}</bar_file>
+		<override>${WORKSPACE}/Build_Config/${project.artifactId}/${target_env}.override</override>
+	</properties>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.5.0</version>
+				<executions>
+					<!-- Create BAR File -->
+					<execution>
+						<id>package-${project.name}</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<skip>compile</skip>
+							<executable>sh</executable>
+							<workingDirectory>${mqsi_bin_home}</workingDirectory>
+							<arguments>
+								<argument>mqsipackagebar</argument>
+								<argument>-w</argument>
+								<argument>${WORKSPACE}</argument>
+								<argument>-a</argument>
+								<argument>${bar_file}</argument>
+								<argument>-k</argument>
+								<argument>${project.artifactId}</argument>
+							</arguments>
+						</configuration>
+					</execution>
+					<!-- Override BAR File -->
+					<execution>
+						<id>override-${project.name}</id>
+						<phase>process-classes</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<skip>compile</skip>
+							<executable>sh</executable>
+							<workingDirectory>${mqsi_bin_home}</workingDirectory>
+							<arguments>
+								<argument>mqsiapplybaroverride</argument>
+								<argument>-b</argument>
+								<argument>${bar_file}</argument>
+								<!-- do not remove the space before the -p -->
+								<argument> -p</argument>
+								<argument>${override}</argument>
+								<argument>-r</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

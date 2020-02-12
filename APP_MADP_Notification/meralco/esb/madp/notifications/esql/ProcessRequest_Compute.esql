@@ -1,0 +1,55 @@
+BROKER SCHEMA meralco.esb.madp.notifications.esql
+PATH meralco.esb.madp.esql;
+
+DECLARE UDP_BASE_URL EXTERNAL CHARACTER '';
+DECLARE UDP_LOG_PREFIX EXTERNAL CHARACTER '';
+DECLARE UDP_LOG_PREFIX_EXTERNAL EXTERNAL CHARACTER '';
+--DECLARE UDP_LOG_FILE_DIR EXTERNAL CHARACTER '';
+
+CREATE COMPUTE MODULE ProcessRequest_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		DECLARE inputRootRef REFERENCE TO InputRoot;
+		DECLARE outputRootRef REFERENCE TO OutputRoot;
+		DECLARE requestRef REFERENCE TO inputRootRef.XMLNSC.notificationRequest;
+
+		CALL logXML(inputRootRef);
+				
+		DECLARE userId CHARACTER COALESCE(requestRef.userId,'');
+		DECLARE notifType CHARACTER COALESCE(requestRef.notifType,'');
+		DECLARE itemId CHARACTER COALESCE(requestRef.itemId,'');
+
+		SET userId = TRIM(userId); 
+		SET notifType = TRIM(notifType);
+		SET itemId = TRIM(itemId);  
+
+		IF userId = '' OR notifType = '' OR itemId = '' THEN
+			RETURN FALSE;
+		END IF;
+
+		CREATE LASTCHILD OF outputRootRef DOMAIN 'JSON' NAME 'JSON';
+		CREATE LASTCHILD OF outputRootRef.JSON NAME 'Data';
+		DECLARE jsonRequest REFERENCE TO outputRootRef.JSON.Data;
+				
+		CREATE LASTCHILD OF jsonRequest NAME 'userid' VALUE userId;
+		CREATE LASTCHILD OF jsonRequest NAME 'notifType' VALUE notifType;
+		CREATE LASTCHILD OF jsonRequest NAME 'itemid' VALUE itemId;
+		
+		DECLARE messageBlob BLOB ASBITSTREAM(outputRootRef.JSON);
+		DECLARE text CHARACTER COALESCE(CAST(messageBlob AS CHAR CCSID 437),'');
+		SET text = '[' || text || ']';
+		
+		DECLARE encodedURL CHARACTER '';
+				
+		--CALL formatUrlString(text) INTO encodedURL;
+		
+		SET encodedURL = text;		
+		CALL logMessage('/var/mqsi/Meralco-MADP/log4j/log4j.xml', 'URL' ,'DEBUG', UDP_BASE_URL || encodedURL);
+
+		CALL logJSON(outputRootRef, 'Request' || ' ' || UDP_LOG_PREFIX);
+		SET OutputLocalEnvironment = InputLocalEnvironment;
+		SET OutputLocalEnvironment.Destination.HTTP.RequestURL = UDP_BASE_URL || encodedURL;				
+		
+		RETURN TRUE;
+	END;
+END MODULE;
